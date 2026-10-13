@@ -40,3 +40,7 @@ Python 3 and `chardet` (`pip install -r requirements.txt`).
 ## Contributing
 
 Contributions are welcome. The build framework is a small Python program with a single third-party dependency (`chardet`), so any Python 3 runtime can run it.
+
+## License
+
+The framework is released under the MIT License (see `LICENSE`). The files under `template/` are released under CC0 1.0 (see `template/LICENSE`) so they can be copied into a project without attribution.

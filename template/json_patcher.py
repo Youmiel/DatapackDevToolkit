@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: CC0-1.0
+
 from pathlib import Path
 import typing as ty
 
