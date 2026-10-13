@@ -2,6 +2,8 @@
 
 > A build framework for Minecraft datapacks that ship the same JSON resources across many game versions from one source tree.
 
+The framework was extracted from [FloatingIslands-Datapack](https://github.com/Youmiel/FloatingIslands-Datapack) and is developed here as a standalone project.
+
 ## Scope
 
 The framework fits datapacks that ship the same JSON resources for several game versions and need the differences between versions to stay small and explicit.
