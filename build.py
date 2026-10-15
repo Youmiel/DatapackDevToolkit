@@ -5,9 +5,13 @@
 # yyy___multi.py: multiple file patch
 # zzz.json: static resource
 
+import sys
+
+# Running this entry point directly must not leave __pycache__ in the project.
+sys.dont_write_bytecode = True
+
 from pathlib import Path
 import os
-import sys
 import typing as ty
 
 from builder.resource_locator import VersionResourceManager

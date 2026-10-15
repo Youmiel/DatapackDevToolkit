@@ -44,18 +44,19 @@ def scan_folder(start_path: ty.Union[str, Path], max_recursion: int = 15, log: b
     - file_predicate: receives file basename, returns whether it is accepted, e.g. file_predicate('sample.txt').
     '''
     result = []
-    sub_path = os.listdir(start_path)
-    if log:
-        print('Scanning', start_path, '...', len(sub_path), 'files/directories')
-    for sub in sub_path:
-        full_path = os.path.join(start_path, sub)
-        if os.path.isfile(full_path) and file_predicate(sub):
-            result.append(full_path)
-        elif os.path.isdir(full_path):
-            if max_recursion > 0:
-                result.extend(scan_folder(full_path, max_recursion - 1, log, file_predicate))
-            else:
-                print(f'Scan depth limit reached, {full_path} is not scanned.', file=sys.stderr)
+    start_path = os.fspath(start_path)
+    for current_path, sub_dir_list, sub_file_list in os.walk(start_path):
+        if log:
+            print('Scanning', current_path, '...', len(sub_dir_list) + len(sub_file_list), 'files/directories')
+        for file_name in sub_file_list:
+            if file_predicate(file_name):
+                result.append(os.path.join(current_path, file_name))
+        relative_path = os.path.relpath(current_path, start_path)
+        depth = 0 if relative_path == os.curdir else relative_path.count(os.sep) + 1
+        if depth >= max_recursion:
+            for sub_dir in sub_dir_list:
+                print(f'Scan depth limit reached, {os.path.join(current_path, sub_dir)} is not scanned.', file=sys.stderr)
+            sub_dir_list.clear()
     return result
 
 
@@ -96,7 +97,6 @@ def create_dirs(path_list: str | ty.List[str]) -> bool:
     '''retruns true if the creations are all succeeded'''
     if isinstance(path_list, str):
         path_list = [path_list]
-    path_list.sort(key=lambda p: len(p), reverse=True)
     no_exception = True
     for p in path_list:
         try:

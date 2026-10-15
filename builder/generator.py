@@ -5,7 +5,6 @@ import typing as ty
 from pathlib import Path
 from types import ModuleType
 import zipfile
-import zlib
 
 from . import file_util, io_util
 from .resource_locator import VersionResourceManager
@@ -30,16 +29,23 @@ def clean_directory(build_dir: ty.Union[str, Path]) -> bool:
 
 
 def scan_sources(res_manager: VersionResourceManager, exclude_file_list: ty.List[str]):
-    source_file_list: ty.List[str] = file_util.scan_folder(res_manager.get_current_version_root())
+    version_root = res_manager.get_current_version_root()
+    source_file_list: ty.List[str] = file_util.scan_folder(version_root)
 
     patch_file_list, static_file_list = [], []
     patch_predicate, cache_predicate = file_util.extension_match('.py'), file_util.part_match('__pycache__')
-    exclude_full_path_list = [os.path.join(res_manager.get_current_version_root(), path) for path in exclude_file_list]
+    exclude_full_path_list = [os.path.join(version_root, path) for path in exclude_file_list]
+    # A relative entry also matches at any depth, so an overlay sub-directory can
+    # exclude its own copy of a file with the same entry as the version root.
+    exclude_pattern_list = [str(path) for path in exclude_file_list]
 
     for filename in source_file_list:
+        relative_path = Path(os.path.relpath(filename, version_root))
+        excluded = filename in exclude_full_path_list \
+            or any(relative_path.match(pattern) for pattern in exclude_pattern_list)
         if patch_predicate(filename):
             patch_file_list.append(filename)
-        elif not cache_predicate(filename) and filename not in exclude_full_path_list:
+        elif not cache_predicate(filename) and not excluded:
             static_file_list.append(filename)
         else:
             pass
@@ -104,8 +110,13 @@ def process_patch(source_version_root: Path, patch_strpath: str, res_manager: Ve
     module_name = '.'.join(Path(patch_strpath).with_suffix('').parts)
     patch_module = importlib.import_module(module_name)
 
-    # only handles json now
-    if patch_module.TYPE == 'json':
+    # a .py file inside a version directory that declares no TYPE is a support
+    # module, not a patch
+    patch_type = getattr(patch_module, 'TYPE', None)
+    if patch_type is None:
+        print(f'    {relative_patch_path} declares no TYPE, treated as a support module and skipped.')
+    elif patch_type == 'json':
+        # only handles json now
         patch_json(relative_patch_path, patch_module, res_manager)
     else:
         print(f'    Unhandled patch {relative_patch_path}')
@@ -119,18 +130,16 @@ def pack_zipfile(build_path: Path, result_root: Path, config: ty.Dict[str, str],
     if missing_file_list:
         print(f'    Extra file(s) not found: {", ".join(missing_file_list)}', file=sys.stderr)
         return False
-    datapack_files = file_util.scan_folder(result_root)
+    datapack_files = sorted(file_util.scan_folder(result_root))
     try:
         with zipfile.ZipFile(pack_path_temp, 'w') as pack_zip:
             for fpath in datapack_files:
                 pack_zip.write(fpath, 
                                 arcname=os.path.relpath(fpath, result_root),
-                                compress_type=zipfile.ZIP_DEFLATED, 
-                                compresslevel=zlib.Z_DEFAULT_COMPRESSION)
+                                compress_type=zipfile.ZIP_DEFLATED)
             for extra_file in extra_file_list:
                 pack_zip.write(extra_file,
-                                compress_type=zipfile.ZIP_DEFLATED, 
-                                compresslevel=zlib.Z_DEFAULT_COMPRESSION)
+                                compress_type=zipfile.ZIP_DEFLATED)
         os.replace(pack_path_temp, pack_path)
         # shutil.move(pack_path_temp, pack_path)
         return True
